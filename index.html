@@ -5,139 +5,76 @@
   <title>School Agenda App</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center h-screen">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-<div id="app" class="w-full max-w-md p-4">
+<div class="w-full max-w-md bg-white p-6 rounded-xl shadow">
+  <h2 class="text-xl font-bold mb-4">📚 My Tasks</h2>
 
-  <!-- LOGIN -->
-  <div id="loginView" class="bg-white p-6 rounded-xl shadow">
-    <h2 class="text-xl font-bold mb-4">Login</h2>
-    <input id="email" type="email" placeholder="Email" class="w-full mb-2 p-2 border rounded">
-    <input id="password" type="password" placeholder="Password" class="w-full mb-4 p-2 border rounded">
-    <button id="loginBtn" class="w-full bg-blue-500 text-white p-2 rounded">Login</button>
+  <!-- INPUT -->
+  <div class="flex mb-4">
+    <input id="taskInput" placeholder="New task..." class="flex-1 p-2 border rounded-l">
+    <button id="addTaskBtn" class="bg-green-500 text-white px-4 rounded-r">Add</button>
   </div>
 
-  <!-- APP -->
-  <div id="appView" class="hidden bg-white p-6 rounded-xl shadow">
-    <h2 class="text-xl font-bold mb-4">My Tasks</h2>
-
-    <div class="flex mb-4">
-      <input id="taskInput" placeholder="New task..." class="flex-1 p-2 border rounded-l">
-      <button id="addTaskBtn" class="bg-green-500 text-white px-4 rounded-r">Add</button>
-    </div>
-
-    <ul id="taskList"></ul>
-
-    <button id="logoutBtn" class="mt-4 text-red-500">Logout</button>
-  </div>
-
+  <!-- LIST -->
+  <ul id="taskList"></ul>
 </div>
 
-<script type="module">
-  // 🔥 Firebase Imports
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
-    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc } 
-    from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+<script>
+  let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
 
-  // 🔥 YOUR CONFIG HERE
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  let currentUser = null;
-
-  // UI Elements
-  const loginView = document.getElementById("loginView");
-  const appView = document.getElementById("appView");
   const taskList = document.getElementById("taskList");
 
-  // 🔐 LOGIN
-  document.getElementById("loginBtn").onclick = async () => {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
-
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  // 🔐 LOGOUT
-  document.getElementById("logoutBtn").onclick = () => signOut(auth);
-
-  // 🔁 AUTH STATE
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      currentUser = user;
-      loginView.classList.add("hidden");
-      appView.classList.remove("hidden");
-      loadTasks();
-    } else {
-      loginView.classList.remove("hidden");
-      appView.classList.add("hidden");
-    }
-  });
-
   // ➕ ADD TASK
-  document.getElementById("addTaskBtn").onclick = async () => {
-    const text = document.getElementById("taskInput").value;
+  document.getElementById("addTaskBtn").onclick = () => {
+    const input = document.getElementById("taskInput");
+    const text = input.value.trim();
 
     if (!text) return;
 
-    try {
-      await addDoc(collection(db, "tasks"), {
-        text: text,
-        done: false,
-        uid: currentUser.uid
-      });
+    tasks.push({ text: text, done: false });
+    localStorage.setItem("tasks", JSON.stringify(tasks));
 
-      document.getElementById("taskInput").value = "";
-      loadTasks();
-    } catch (err) {
-      console.error(err);
-    }
+    input.value = "";
+    renderTasks();
   };
 
-  // 📥 LOAD TASKS
-  async function loadTasks() {
+  // 📥 RENDER TASKS
+  function renderTasks() {
     taskList.innerHTML = "";
 
-    const q = query(collection(db, "tasks"), where("uid", "==", currentUser.uid));
-    const snapshot = await getDocs(q);
-
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-
+    tasks.forEach((task, index) => {
       const li = document.createElement("li");
       li.className = "flex justify-between items-center p-2 border-b";
 
       const span = document.createElement("span");
-      span.textContent = data.text;
-      if (data.done) span.classList.add("line-through");
+      span.textContent = task.text;
+      if (task.done) span.classList.add("line-through");
 
-      span.onclick = () => toggleTask(docSnap.id, data.done);
+      // toggle
+      span.onclick = () => {
+        tasks[index].done = !tasks[index].done;
+        localStorage.setItem("tasks", JSON.stringify(tasks));
+        renderTasks();
+      };
+
+      // delete
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "❌";
+      delBtn.onclick = () => {
+        tasks.splice(index, 1);
+        localStorage.setItem("tasks", JSON.stringify(tasks));
+        renderTasks();
+      };
 
       li.appendChild(span);
+      li.appendChild(delBtn);
       taskList.appendChild(li);
     });
   }
 
-  // ✅ TOGGLE TASK
-  async function toggleTask(id, done) {
-    const ref = doc(db, "tasks", id);
-    await updateDoc(ref, { done: !done });
-    loadTasks();
-  }
-
+  // INIT
+  renderTasks();
 </script>
 
 </body>
