@@ -1,79 +1,111 @@
-<<html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>School Agenda App</title>
+  <title>Theatre Booking</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-<div class="w-full max-w-md bg-white p-6 rounded-xl shadow">
-  <h2 class="text-xl font-bold mb-4">📚 My Tasks</h2>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-r from-pink-500 to-orange-400">
 
-  <!-- INPUT -->
-  <div class="flex mb-4">
-    <input id="taskInput" placeholder="New task..." class="flex-1 p-2 border rounded-l">
-    <button id="addTaskBtn" class="bg-green-500 text-white px-4 rounded-r">Add</button>
-  </div>
+<div class="w-full max-w-lg bg-white/90 backdrop-blur p-6 rounded-2xl shadow-xl">
 
-  <!-- LIST -->
-  <ul id="taskList"></ul>
+  <h1 class="text-2xl font-bold mb-4 text-center">🎭 Theatre Booking</h1>
+
+  <!-- SELECT SHOW -->
+  <select id="show" class="w-full p-2 border rounded mb-3">
+    <option value="">Select a show</option>
+    <option>Hamlet</option>
+    <option>The Lion King</option>
+    <option>Phantom of the Opera</option>
+  </select>
+
+  <!-- SELECT TIME -->
+  <select id="time" class="w-full p-2 border rounded mb-3">
+    <option value="">Select time</option>
+    <option>18:00</option>
+    <option>20:00</option>
+    <option>22:00</option>
+  </select>
+
+  <!-- SEATS -->
+  <div class="grid grid-cols-5 gap-2 mb-4" id="seats"></div>
+
+  <!-- BOOK BUTTON -->
+  <button id="bookBtn" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+    Book Seat
+  </button>
+
+  <!-- BOOKINGS -->
+  <h2 class="mt-6 font-bold">📋 My Bookings</h2>
+  <ul id="bookingList" class="mt-2"></ul>
+
 </div>
 
 <script>
-  let tasks = JSON.parse(localStorage.getItem("tasks")) || [];
+  const seatsContainer = document.getElementById("seats");
+  const bookingList = document.getElementById("bookingList");
 
-  const taskList = document.getElementById("taskList");
+  let selectedSeat = null;
+  let bookings = JSON.parse(localStorage.getItem("bookings")) || [];
 
-  // ➕ ADD TASK
-  document.getElementById("addTaskBtn").onclick = () => {
-    const input = document.getElementById("taskInput");
-    const text = input.value.trim();
+  // 🎟 GENERATE SEATS
+  for (let i = 1; i <= 15; i++) {
+    const seat = document.createElement("div");
+    seat.textContent = i;
+    seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer";
 
-    if (!text) return;
+    seat.onclick = () => {
+      document.querySelectorAll("#seats div").forEach(s => s.classList.remove("bg-green-400"));
+      seat.classList.add("bg-green-400");
+      selectedSeat = i;
+    };
 
-    tasks.push({ text: text, done: false });
-    localStorage.setItem("tasks", JSON.stringify(tasks));
+    seatsContainer.appendChild(seat);
+  }
 
-    input.value = "";
-    renderTasks();
+  // 🎯 BOOK
+  document.getElementById("bookBtn").onclick = () => {
+    const show = document.getElementById("show").value;
+    const time = document.getElementById("time").value;
+
+    if (!show || !time || !selectedSeat) {
+      alert("Please select show, time and seat");
+      return;
+    }
+
+    const booking = { show, time, seat: selectedSeat };
+    bookings.push(booking);
+    localStorage.setItem("bookings", JSON.stringify(bookings));
+
+    renderBookings();
   };
 
-  // 📥 RENDER TASKS
-  function renderTasks() {
-    taskList.innerHTML = "";
+  // 📥 RENDER BOOKINGS
+  function renderBookings() {
+    bookingList.innerHTML = "";
 
-    tasks.forEach((task, index) => {
+    bookings.forEach((b, i) => {
       const li = document.createElement("li");
-      li.className = "flex justify-between items-center p-2 border-b";
+      li.className = "flex justify-between border-b p-2";
 
-      const span = document.createElement("span");
-      span.textContent = task.text;
-      if (task.done) span.classList.add("line-through");
+      li.innerHTML = `
+        🎭 ${b.show} - ⏰ ${b.time} - 💺 ${b.seat}
+        <button onclick="deleteBooking(${i})">❌</button>
+      `;
 
-      // toggle
-      span.onclick = () => {
-        tasks[index].done = !tasks[index].done;
-        localStorage.setItem("tasks", JSON.stringify(tasks));
-        renderTasks();
-      };
-
-      // delete
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "❌";
-      delBtn.onclick = () => {
-        tasks.splice(index, 1);
-        localStorage.setItem("tasks", JSON.stringify(tasks));
-        renderTasks();
-      };
-
-      li.appendChild(span);
-      li.appendChild(delBtn);
-      taskList.appendChild(li);
+      bookingList.appendChild(li);
     });
   }
 
-  // INIT
-  renderTasks();
+  // ❌ DELETE
+  function deleteBooking(i) {
+    bookings.splice(i, 1);
+    localStorage.setItem("bookings", JSON.stringify(bookings));
+    renderBookings();
+  }
+
+  renderBookings();
 </script>
 
 </body>
