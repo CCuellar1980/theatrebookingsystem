@@ -1,112 +1,139 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Theatre Booking</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Theatre Booking</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="min-h-screen flex items-center justify-center bg-gradient-to-r from-pink-500 to-orange-400">
-
 <div class="w-full max-w-lg bg-white/90 backdrop-blur p-6 rounded-2xl shadow-xl">
+<h1 class="text-2xl font-bold mb-4 text-center"> Theatre Booking</h1>
 
-  <h1 class="text-2xl font-bold mb-4 text-center">🎭 Theatre Booking</h1>
+<!-- SELECT SHOW -->
+<select id="show" class="w-full p-2 border rounded mb-3">
+<option value="">Select a show</option>
+<option>Hamlet</option>
+<option>The Lion King</option>
+<option>Phantom of the Opera</option>
+</select>
 
-  <!-- SELECT SHOW -->
-  <select id="show" class="w-full p-2 border rounded mb-3">
-    <option value="">Select a show</option>
-    <option>Hamlet</option>
-    <option>The Lion King</option>
-    <option>Phantom of the Opera</option>
-  </select>
+<!-- SELECT TIME -->
+<select id="time" class="w-full p-2 border rounded mb-3">
+<option value="">Select time</option>
+<option>18:00</option>
+<option>20:00</option>
+<option>22:00</option>
+</select>
 
-  <!-- SELECT TIME -->
-  <select id="time" class="w-full p-2 border rounded mb-3">
-    <option value="">Select time</option>
-    <option>18:00</option>
-    <option>20:00</option>
-    <option>22:00</option>
-  </select>
+<!-- SEATS -->
+<div class="grid grid-cols-5 gap-2 mb-4" id="seats"></div>
 
-  <!-- SEATS -->
-  <div class="grid grid-cols-5 gap-2 mb-4" id="seats"></div>
+<!-- BOOK BUTTON -->
+<button id="bookBtn" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+Book Seat
+</button>
 
-  <!-- BOOK BUTTON -->
-  <button id="bookBtn" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
-    Book Seat
-  </button>
-
-  <!-- BOOKINGS -->
-  <h2 class="mt-6 font-bold">📋 My Bookings</h2>
-  <ul id="bookingList" class="mt-2"></ul>
-
+<!-- BOOKINGS -->
+<h2 class="mt-6 font-bold"> My Bookings</h2>
+<ul id="bookingList" class="mt-2"></ul>
 </div>
 
-<script>
-  const seatsContainer = document.getElementById("seats");
-  const bookingList = document.getElementById("bookingList");
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+getFirestore,
+collection,
+addDoc,
+getDocs,
+deleteDoc,
+doc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let selectedSeat = null;
-  let bookings = JSON.parse(localStorage.getItem("bookings")) || [];
+const firebaseConfig = {
+apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
+authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
+projectId: "theatre-booking-system-d45a7",
+storageBucket: "theatre-booking-system-d45a7.firebasestorage.app",
+messagingSenderId: "66972534681",
+appId: "1:66972534681:web:1995cb45236fc107ee3508",
+measurementId: "G-57HNT4357H"
+};
 
-  // 🎟 GENERATE SEATS
-  for (let i = 1; i <= 15; i++) {
-    const seat = document.createElement("div");
-    seat.textContent = i;
-    seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    seat.onclick = () => {
-      document.querySelectorAll("#seats div").forEach(s => s.classList.remove("bg-green-400"));
-      seat.classList.add("bg-green-400");
-      selectedSeat = i;
-    };
+const seatsContainer = document.getElementById("seats");
+const bookingList = document.getElementById("bookingList");
 
-    seatsContainer.appendChild(seat);
-  }
+let selectedSeat = null;
 
-  // 🎯 BOOK
-  document.getElementById("bookBtn").onclick = () => {
-    const show = document.getElementById("show").value;
-    const time = document.getElementById("time").value;
+for (let i = 1; i <= 15; i++) {
+const seat = document.createElement("div");
+seat.textContent = i;
+seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer";
 
-    if (!show || !time || !selectedSeat) {
-      alert("Please select show, time and seat");
-      return;
-    }
+seat.onclick = () => {
+document.querySelectorAll("#seats div").forEach(s =>
+s.classList.remove("bg-green-400")
+);
+seat.classList.add("bg-green-400");
+selectedSeat = i;
+};
 
-    const booking = { show, time, seat: selectedSeat };
-    bookings.push(booking);
-    localStorage.setItem("bookings", JSON.stringify(bookings));
+seatsContainer.appendChild(seat);
+}
 
-    renderBookings();
-  };
+async function loadBookings() {
+bookingList.innerHTML = "";
 
-  // 📥 RENDER BOOKINGS
-  function renderBookings() {
-    bookingList.innerHTML = "";
+const querySnapshot = await getDocs(collection(db, "bookings"));
 
-    bookings.forEach((b, i) => {
-      const li = document.createElement("li");
-      li.className = "flex justify-between border-b p-2";
+querySnapshot.forEach((bookingDoc) => {
+const b = bookingDoc.data();
+const li = document.createElement("li");
+li.className = "flex justify-between border-b p-2";
 
-      li.innerHTML = `
-        🎭 ${b.show} - ⏰ ${b.time} - 💺 ${b.seat}
-        <button onclick="deleteBooking(${i})">❌</button>
-      `;
+li.innerHTML = `
+<span> ${b.show} - ${b.time} - ${b.seat}</span>
+<button class="text-red-500 font-bold"></button>
+`;
 
-      bookingList.appendChild(li);
-    });
-  }
+li.querySelector("button").onclick = async () => {
+await deleteDoc(doc(db, "bookings", bookingDoc.id));
+loadBookings();
+};
 
-  // ❌ DELETE
-  function deleteBooking(i) {
-    bookings.splice(i, 1);
-    localStorage.setItem("bookings", JSON.stringify(bookings));
-    renderBookings();
-  }
+bookingList.appendChild(li);
+});
+}
 
-  renderBookings();
+document.getElementById("bookBtn").onclick = async () => {
+const show = document.getElementById("show").value;
+const time = document.getElementById("time").value;
+
+if (!show || !time || !selectedSeat) {
+alert("Please select show, time and seat");
+return;
+}
+
+await addDoc(collection(db, "bookings"), {
+show,
+time,
+seat: selectedSeat
+});
+
+selectedSeat = null;
+document.querySelectorAll("#seats div").forEach(s =>
+s.classList.remove("bg-green-400")
+);
+
+loadBookings();
+};
+
+loadBookings();
+console.log("Firestore Database connected successfully!");
 </script>
-
 </body>
 </html>
