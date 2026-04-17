@@ -1,64 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Theatre Booking</title>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-
-<body class="min-h-screen flex items-center justify-center bg-gradient-to-r from-pink-500 to-orange-400">
-<div class="w-full max-w-lg bg-white/90 backdrop-blur p-6 rounded-2xl shadow-xl">
-<h1 class="text-2xl font-bold mb-4 text-center"> Theatre Booking</h1>
-
-<!-- SELECT SHOW -->
-<select id="show" class="w-full p-2 border rounded mb-3">
-<option value="">Select a show</option>
-<option>Hamlet</option>
-<option>The Lion King</option>
-<option>Phantom of the Opera</option>
-</select>
-
-<!-- SELECT TIME -->
-<select id="time" class="w-full p-2 border rounded mb-3">
-<option value="">Select time</option>
-<option>18:00</option>
-<option>20:00</option>
-<option>22:00</option>
-</select>
-
-<!-- SEATS -->
-<div class="grid grid-cols-5 gap-2 mb-4" id="seats"></div>
-
-<!-- BOOK BUTTON -->
-<button id="bookBtn" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
-Book Seat
-</button>
-
-<!-- BOOKINGS -->
-<h2 class="mt-6 font-bold"> My Bookings</h2>
-<ul id="bookingList" class="mt-2"></ul>
-</div>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-getFirestore,
-collection,
-addDoc,
-getDocs,
-deleteDoc,
-doc
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
-authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
-projectId: "theatre-booking-system-d45a7",
-storageBucket: "theatre-booking-system-d45a7.firebasestorage.app",
-messagingSenderId: "66972534681",
-appId: "1:66972534681:web:1995cb45236fc107ee3508",
-measurementId: "G-57HNT4357H"
+  apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
+  authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
+  projectId: "theatre-booking-system-d45a7",
+  storageBucket: "theatre-booking-system-d45a7.appspot.com",
+  messagingSenderId: "66972534681",
+  appId: "1:66972534681:web:1995cb45236fc107ee3508"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -69,71 +28,117 @@ const bookingList = document.getElementById("bookingList");
 
 let selectedSeat = null;
 
+// 🎟️ CREATE SEATS
 for (let i = 1; i <= 15; i++) {
-const seat = document.createElement("div");
-seat.textContent = i;
-seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer";
+  const seat = document.createElement("div");
+  seat.textContent = i;
+  seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer hover:bg-gray-300 transition";
 
-seat.onclick = () => {
-document.querySelectorAll("#seats div").forEach(s =>
-s.classList.remove("bg-green-400")
-);
-seat.classList.add("bg-green-400");
-selectedSeat = i;
-};
+  seat.onclick = () => {
+    document.querySelectorAll("#seats div").forEach(s =>
+      s.classList.remove("bg-green-400")
+    );
+    seat.classList.add("bg-green-400");
+    selectedSeat = i;
+  };
 
-seatsContainer.appendChild(seat);
+  seatsContainer.appendChild(seat);
 }
 
+// 📥 LOAD BOOKINGS
 async function loadBookings() {
-bookingList.innerHTML = "";
+  bookingList.innerHTML = "";
 
-const querySnapshot = await getDocs(collection(db, "bookings"));
+  const querySnapshot = await getDocs(collection(db, "bookings"));
 
-querySnapshot.forEach((bookingDoc) => {
-const b = bookingDoc.data();
-const li = document.createElement("li");
-li.className = "flex justify-between border-b p-2";
+  querySnapshot.forEach((bookingDoc) => {
+    const b = bookingDoc.data();
 
-li.innerHTML = `
-<span> ${b.show} - ${b.time} - ${b.seat}</span>
-<button class="text-red-500 font-bold"></button>
-`;
+    const li = document.createElement("li");
+    li.className = "flex justify-between items-center border-b p-2";
 
-li.querySelector("button").onclick = async () => {
-await deleteDoc(doc(db, "bookings", bookingDoc.id));
-loadBookings();
-};
+    li.innerHTML = `
+      <span class="text-sm">${b.show} - ${b.time} - Seat ${b.seat}</span>
+      <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
+    `;
 
-bookingList.appendChild(li);
-});
+    li.querySelector("button").onclick = async () => {
+      try {
+        await deleteDoc(doc(db, "bookings", bookingDoc.id));
+        showMessage("Booking deleted ❌", "red");
+        loadBookings();
+      } catch (error) {
+        console.error(error);
+        showMessage("Error deleting booking", "red");
+      }
+    };
+
+    bookingList.appendChild(li);
+  });
 }
 
+// 🚫 CHECK DOUBLE BOOKING
+async function isSeatBooked(show, time, seat) {
+  const q = query(
+    collection(db, "bookings"),
+    where("show", "==", show),
+    where("time", "==", time),
+    where("seat", "==", seat)
+  );
+
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
+// 📢 MESSAGE UI
+function showMessage(text, color) {
+  const msg = document.createElement("div");
+  msg.textContent = text;
+  msg.className = `mt-3 text-center text-${color}-600 font-semibold`;
+
+  document.querySelector(".max-w-lg").appendChild(msg);
+
+  setTimeout(() => msg.remove(), 2500);
+}
+
+// 🎯 BOOK BUTTON
 document.getElementById("bookBtn").onclick = async () => {
-const show = document.getElementById("show").value;
-const time = document.getElementById("time").value;
+  const show = document.getElementById("show").value;
+  const time = document.getElementById("time").value;
 
-if (!show || !time || !selectedSeat) {
-alert("Please select show, time and seat");
-return;
-}
+  if (!show || !time || !selectedSeat) {
+    showMessage("Please select show, time, and seat", "red");
+    return;
+  }
 
-await addDoc(collection(db, "bookings"), {
-show,
-time,
-seat: selectedSeat
-});
+  try {
+    const alreadyBooked = await isSeatBooked(show, time, selectedSeat);
 
-selectedSeat = null;
-document.querySelectorAll("#seats div").forEach(s =>
-s.classList.remove("bg-green-400")
-);
+    if (alreadyBooked) {
+      showMessage("Seat already booked ❌", "red");
+      return;
+    }
 
-loadBookings();
+    await addDoc(collection(db, "bookings"), {
+      show,
+      time,
+      seat: selectedSeat
+    });
+
+    showMessage("Booking successful 🎉", "green");
+
+    selectedSeat = null;
+    document.querySelectorAll("#seats div").forEach(s =>
+      s.classList.remove("bg-green-400")
+    );
+
+    loadBookings();
+  } catch (error) {
+    console.error(error);
+    showMessage("Error saving booking", "red");
+  }
 };
 
 loadBookings();
-console.log("Firestore Database connected successfully!");
+console.log("Firestore connected ✅");
 </script>
-</body>
-</html>
