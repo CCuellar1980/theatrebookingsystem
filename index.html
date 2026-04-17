@@ -1,3 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Theatre Booking</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
+
+<div class="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
+
+  <!-- HEADER -->
+  <h1 class="text-3xl font-extrabold text-center mb-2">🎭 Theatre Booking</h1>
+  <p class="text-center text-gray-500 mb-6">
+    Book your seat in seconds. Simple, fast, and reliable.
+  </p>
+
+  <!-- FORM -->
+  <div class="grid md:grid-cols-2 gap-4 mb-6">
+
+    <div>
+      <label class="text-sm font-semibold text-gray-600">Select Show</label>
+      <select id="show" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-purple-400">
+        <option value="">Choose a show</option>
+        <option>Hamlet</option>
+        <option>The Lion King</option>
+        <option>Phantom of the Opera</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="text-sm font-semibold text-gray-600">Select Time</label>
+      <select id="time" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-purple-400">
+        <option value="">Choose time</option>
+        <option>18:00</option>
+        <option>20:00</option>
+        <option>22:00</option>
+      </select>
+    </div>
+
+  </div>
+
+  <!-- SEATS -->
+  <h2 class="font-bold mb-2">Choose Your Seat</h2>
+  <div id="seats" class="grid grid-cols-5 gap-3 mb-6"></div>
+
+  <!-- BUTTON -->
+  <button id="bookBtn"
+    class="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition">
+    🎟️ Book Now
+  </button>
+
+  <!-- MESSAGE -->
+  <div id="message" class="text-center mt-4 font-semibold"></div>
+
+  <!-- BOOKINGS -->
+  <div class="mt-8">
+    <h2 class="text-xl font-bold mb-3">📋 My Bookings</h2>
+    <ul id="bookingList" class="space-y-2"></ul>
+  </div>
+
+</div>
+
+<!-- SCRIPT -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -12,12 +78,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
-  authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
-  projectId: "theatre-booking-system-d45a7",
-  storageBucket: "theatre-booking-system-d45a7.appspot.com",
-  messagingSenderId: "66972534681",
-  appId: "1:66972534681:web:1995cb45236fc107ee3508"
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -25,59 +88,37 @@ const db = getFirestore(app);
 
 const seatsContainer = document.getElementById("seats");
 const bookingList = document.getElementById("bookingList");
+const messageBox = document.getElementById("message");
 
 let selectedSeat = null;
 
-// 🎟️ CREATE SEATS
+// 🎟️ SEATS UI
 for (let i = 1; i <= 15; i++) {
   const seat = document.createElement("div");
   seat.textContent = i;
-  seat.className = "p-2 bg-gray-200 text-center rounded cursor-pointer hover:bg-gray-300 transition";
+
+  seat.className =
+    "p-3 text-center rounded-xl cursor-pointer bg-gray-200 hover:bg-gray-300 transition font-bold";
 
   seat.onclick = () => {
     document.querySelectorAll("#seats div").forEach(s =>
-      s.classList.remove("bg-green-400")
+      s.classList.remove("bg-green-500", "text-white")
     );
-    seat.classList.add("bg-green-400");
+
+    seat.classList.add("bg-green-500", "text-white");
     selectedSeat = i;
   };
 
   seatsContainer.appendChild(seat);
 }
 
-// 📥 LOAD BOOKINGS
-async function loadBookings() {
-  bookingList.innerHTML = "";
-
-  const querySnapshot = await getDocs(collection(db, "bookings"));
-
-  querySnapshot.forEach((bookingDoc) => {
-    const b = bookingDoc.data();
-
-    const li = document.createElement("li");
-    li.className = "flex justify-between items-center border-b p-2";
-
-    li.innerHTML = `
-      <span class="text-sm">${b.show} - ${b.time} - Seat ${b.seat}</span>
-      <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
-    `;
-
-    li.querySelector("button").onclick = async () => {
-      try {
-        await deleteDoc(doc(db, "bookings", bookingDoc.id));
-        showMessage("Booking deleted ❌", "red");
-        loadBookings();
-      } catch (error) {
-        console.error(error);
-        showMessage("Error deleting booking", "red");
-      }
-    };
-
-    bookingList.appendChild(li);
-  });
+// 📢 MESSAGE
+function showMessage(text, color) {
+  messageBox.textContent = text;
+  messageBox.className = `text-${color}-600 text-center mt-4 font-bold`;
 }
 
-// 🚫 CHECK DOUBLE BOOKING
+// 🚫 CHECK DUPLICATE
 async function isSeatBooked(show, time, seat) {
   const q = query(
     collection(db, "bookings"),
@@ -90,55 +131,72 @@ async function isSeatBooked(show, time, seat) {
   return !snapshot.empty;
 }
 
-// 📢 MESSAGE UI
-function showMessage(text, color) {
-  const msg = document.createElement("div");
-  msg.textContent = text;
-  msg.className = `mt-3 text-center text-${color}-600 font-semibold`;
+// 📥 LOAD BOOKINGS
+async function loadBookings() {
+  bookingList.innerHTML = "";
 
-  document.querySelector(".max-w-lg").appendChild(msg);
+  const snapshot = await getDocs(collection(db, "bookings"));
 
-  setTimeout(() => msg.remove(), 2500);
+  snapshot.forEach((docSnap) => {
+    const b = docSnap.data();
+
+    const li = document.createElement("li");
+    li.className =
+      "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
+
+    li.innerHTML = `
+      <span>${b.show} | ${b.time} | Seat ${b.seat}</span>
+      <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
+    `;
+
+    li.querySelector("button").onclick = async () => {
+      await deleteDoc(doc(db, "bookings", docSnap.id));
+      showMessage("Booking deleted", "red");
+      loadBookings();
+    };
+
+    bookingList.appendChild(li);
+  });
 }
 
-// 🎯 BOOK BUTTON
+// 🎯 BOOK
 document.getElementById("bookBtn").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
 
   if (!show || !time || !selectedSeat) {
-    showMessage("Please select show, time, and seat", "red");
+    showMessage("⚠️ Complete all fields", "red");
     return;
   }
 
-  try {
-    const alreadyBooked = await isSeatBooked(show, time, selectedSeat);
+  const taken = await isSeatBooked(show, time, selectedSeat);
 
-    if (alreadyBooked) {
-      showMessage("Seat already booked ❌", "red");
-      return;
-    }
-
-    await addDoc(collection(db, "bookings"), {
-      show,
-      time,
-      seat: selectedSeat
-    });
-
-    showMessage("Booking successful 🎉", "green");
-
-    selectedSeat = null;
-    document.querySelectorAll("#seats div").forEach(s =>
-      s.classList.remove("bg-green-400")
-    );
-
-    loadBookings();
-  } catch (error) {
-    console.error(error);
-    showMessage("Error saving booking", "red");
+  if (taken) {
+    showMessage("❌ Seat already booked", "red");
+    return;
   }
+
+  await addDoc(collection(db, "bookings"), {
+    show,
+    time,
+    seat: selectedSeat
+  });
+
+  showMessage("✅ Booking successful!", "green");
+
+  selectedSeat = null;
+  document.querySelectorAll("#seats div").forEach(s =>
+    s.classList.remove("bg-green-500", "text-white")
+  );
+
+  loadBookings();
 };
 
+loadBookings();
+</script>
+
+</body>
+</html>
 loadBookings();
 console.log("Firestore connected ✅");
 </script>
