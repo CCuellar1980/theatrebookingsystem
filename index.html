@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Theatre Booking</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -11,18 +11,17 @@
 
 <div class="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
 
-  <!-- HEADER -->
   <h1 class="text-3xl font-extrabold text-center mb-2">🎭 Theatre Booking</h1>
   <p class="text-center text-gray-500 mb-6">
-    Book your seat in seconds. Simple, fast, and reliable.
+    Select your show, time, and seats
   </p>
 
   <!-- FORM -->
   <div class="grid md:grid-cols-2 gap-4 mb-6">
 
     <div>
-      <label class="text-sm font-semibold text-gray-600">Select Show</label>
-      <select id="show" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-purple-400">
+      <label class="text-sm font-semibold text-gray-600">Show</label>
+      <select id="show" class="w-full p-3 border rounded-xl">
         <option value="">Choose a show</option>
         <option>Hamlet</option>
         <option>The Lion King</option>
@@ -31,8 +30,8 @@
     </div>
 
     <div>
-      <label class="text-sm font-semibold text-gray-600">Select Time</label>
-      <select id="time" class="w-full p-3 border rounded-xl focus:ring-2 focus:ring-purple-400">
+      <label class="text-sm font-semibold text-gray-600">Time</label>
+      <select id="time" class="w-full p-3 border rounded-xl">
         <option value="">Choose time</option>
         <option>18:00</option>
         <option>20:00</option>
@@ -43,17 +42,18 @@
   </div>
 
   <!-- SEATS -->
-  <h2 class="font-bold mb-2">Choose Your Seat</h2>
-  <div id="seats" class="grid grid-cols-5 gap-3 mb-6"></div>
+  <h2 class="font-bold mb-2">Choose Seats</h2>
+  <div id="seats" class="grid grid-cols-5 gap-3 mb-4"></div>
+  <p class="text-sm text-gray-500 mb-4">You can select multiple seats</p>
 
   <!-- BUTTON -->
   <button id="bookBtn"
-    class="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition">
+    class="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700">
     🎟️ Book Now
   </button>
 
   <!-- MESSAGE -->
-  <div id="message" class="text-center mt-4 font-semibold"></div>
+  <div id="message" class="text-center mt-4 font-bold"></div>
 
   <!-- BOOKINGS -->
   <div class="mt-8">
@@ -63,7 +63,6 @@
 
 </div>
 
-<!-- SCRIPT -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -77,10 +76,14 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// 🔥 YOUR REAL CONFIG (keep this)
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_ID"
+  apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
+  authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
+  projectId: "theatre-booking-system-d45a7",
+  storageBucket: "theatre-booking-system-d45a7.appspot.com",
+  messagingSenderId: "66972534681",
+  appId: "1:66972534681:web:1995cb45236fc107ee3508"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -90,23 +93,24 @@ const seatsContainer = document.getElementById("seats");
 const bookingList = document.getElementById("bookingList");
 const messageBox = document.getElementById("message");
 
-let selectedSeat = null;
+let selectedSeats = [];
 
-// 🎟️ SEATS UI
+// 🎟️ CREATE SEATS
 for (let i = 1; i <= 15; i++) {
   const seat = document.createElement("div");
   seat.textContent = i;
 
   seat.className =
-    "p-3 text-center rounded-xl cursor-pointer bg-gray-200 hover:bg-gray-300 transition font-bold";
+    "p-3 text-center rounded-xl cursor-pointer bg-gray-200 hover:bg-gray-300 font-bold";
 
   seat.onclick = () => {
-    document.querySelectorAll("#seats div").forEach(s =>
-      s.classList.remove("bg-green-500", "text-white")
-    );
-
-    seat.classList.add("bg-green-500", "text-white");
-    selectedSeat = i;
+    if (selectedSeats.includes(i)) {
+      selectedSeats = selectedSeats.filter(s => s !== i);
+      seat.classList.remove("bg-green-500", "text-white");
+    } else {
+      selectedSeats.push(i);
+      seat.classList.add("bg-green-500", "text-white");
+    }
   };
 
   seatsContainer.appendChild(seat);
@@ -119,16 +123,19 @@ function showMessage(text, color) {
 }
 
 // 🚫 CHECK DUPLICATE
-async function isSeatBooked(show, time, seat) {
-  const q = query(
-    collection(db, "bookings"),
-    where("show", "==", show),
-    where("time", "==", time),
-    where("seat", "==", seat)
-  );
+async function isAnySeatBooked(show, time, seats) {
+  for (let seat of seats) {
+    const q = query(
+      collection(db, "bookings"),
+      where("show", "==", show),
+      where("time", "==", time),
+      where("seat", "==", seat)
+    );
 
-  const snapshot = await getDocs(q);
-  return !snapshot.empty;
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) return true;
+  }
+  return false;
 }
 
 // 📥 LOAD BOOKINGS
@@ -164,27 +171,29 @@ document.getElementById("bookBtn").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
 
-  if (!show || !time || !selectedSeat) {
+  if (!show || !time || selectedSeats.length === 0) {
     showMessage("⚠️ Complete all fields", "red");
     return;
   }
 
-  const taken = await isSeatBooked(show, time, selectedSeat);
+  const taken = await isAnySeatBooked(show, time, selectedSeats);
 
   if (taken) {
-    showMessage("❌ Seat already booked", "red");
+    showMessage("❌ One or more seats already booked", "red");
     return;
   }
 
-  await addDoc(collection(db, "bookings"), {
-    show,
-    time,
-    seat: selectedSeat
-  });
+  for (let seat of selectedSeats) {
+    await addDoc(collection(db, "bookings"), {
+      show,
+      time,
+      seat
+    });
+  }
 
   showMessage("✅ Booking successful!", "green");
 
-  selectedSeat = null;
+  selectedSeats = [];
   document.querySelectorAll("#seats div").forEach(s =>
     s.classList.remove("bg-green-500", "text-white")
   );
