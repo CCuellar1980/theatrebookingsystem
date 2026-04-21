@@ -7,7 +7,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
+<body class="min-h-screen bg-gradient-to-br from-pink-500 via-purple-600 to-orange-400 flex items-center justify-center p-4">
 
 <div class="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
 
@@ -38,29 +38,38 @@
   </div>
 
   <!-- SEATS -->
-  <div id="seats" class="grid grid-cols-5 gap-2 mb-4"></div>
+  <div id="seats" class="grid grid-cols-5 gap-3 mb-4"></div>
 
   <!-- TOTAL -->
   <div id="total" class="text-center font-bold mb-2"></div>
 
-  <!-- BUTTON -->
-  <button id="book" class="w-full bg-purple-600 text-white p-3 rounded-xl">
-    Book Now
+  <!-- BUTTONS -->
+  <button id="book"
+    class="w-full bg-purple-600 text-white p-3 rounded-xl transition hover:scale-105 hover:bg-purple-700">
+    Book Now 🎟️
   </button>
 
-  <!-- MESSAGE -->
+  <button id="ticketBtn"
+    class="w-full mt-2 bg-green-500 text-white p-3 rounded-xl hover:scale-105 transition">
+    Download Ticket 🧾
+  </button>
+
   <div id="msg" class="text-center mt-3 font-bold"></div>
 
-  <!-- BOOKINGS -->
   <ul id="list" class="mt-6 space-y-2"></ul>
 
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR FIREBASE CONFIG (UNCHANGED)
+// 🔥 FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
   authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
@@ -72,43 +81,53 @@ const db = getFirestore(app);
 
 let selected = [];
 
-// 🎟 SEATS
+// 💺 SEATS (CINEMA STYLE)
 const seatsDiv = document.getElementById("seats");
 
-for (let i = 1; i <= 15; i++) {
-  const s = document.createElement("div");
-  s.textContent = i;
-  s.className = "p-3 bg-gray-200 text-center rounded cursor-pointer font-bold";
+const layout = [
+  [1,2,3,4,5],
+  [6,7,8,9,10],
+  [11,12,13,14,15]
+];
 
-  s.onclick = () => {
-    if (s.classList.contains("bg-red-400")) return;
+layout.forEach(row => {
+  row.forEach(num => {
+    const seat = document.createElement("div");
 
-    if (selected.includes(i)) {
-      selected = selected.filter(x => x !== i);
-      s.classList.remove("bg-green-500","text-white");
-    } else {
-      selected.push(i);
-      s.classList.add("bg-green-500","text-white");
-    }
+    seat.textContent = num;
+    seat.className =
+      "p-3 bg-gray-200 text-center rounded cursor-pointer font-bold hover:scale-110 transition";
 
-    updateTotal();
-  };
+    seat.onclick = () => {
+      if (seat.classList.contains("bg-red-400")) return;
 
-  seatsDiv.appendChild(s);
-}
+      if (selected.includes(num)) {
+        selected = selected.filter(x => x !== num);
+        seat.classList.remove("bg-green-500","text-white");
+      } else {
+        selected.push(num);
+        seat.classList.add("bg-green-500","text-white");
+      }
 
-// 💰 TOTAL PRICE
+      updateTotal();
+    };
+
+    seatsDiv.appendChild(seat);
+  });
+});
+
+// 💰 TOTAL
 function updateTotal() {
   const type = document.getElementById("type").value;
   const price = type === "adult" ? 15 : type === "kid" ? 8 : 0;
 
   document.getElementById("total").textContent =
-    selected.length ? "Total: $" + (selected.length * price) : "";
+    selected.length ? `Total: $${selected.length * price}` : "";
 }
 
 document.getElementById("type").onchange = updateTotal;
 
-// 📥 LOAD BOOKINGS + LOCK SEATS
+// 📥 LOAD + LOCK SEATS
 async function load() {
   const snap = await getDocs(collection(db, "bookings"));
   const list = document.getElementById("list");
@@ -131,9 +150,9 @@ async function load() {
     }
   });
 
-  // 🔴 lock seats
-  document.querySelectorAll("#seats div").forEach((s, i) => {
-    const num = i + 1;
+  document.querySelectorAll("#seats div").forEach(s => {
+    const num = parseInt(s.textContent);
+
     s.classList.remove("bg-red-400");
 
     if (booked.includes(num)) {
@@ -142,7 +161,7 @@ async function load() {
   });
 }
 
-// 🎯 BOOK (FINAL FIX)
+// 🎟 BOOK (FIXED)
 document.getElementById("book").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
@@ -176,11 +195,35 @@ document.getElementById("book").onclick = async () => {
     updateTotal();
     load();
 
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
     document.getElementById("msg").textContent =
-      "❌ Firebase Error: " + error.message;
+      "❌ Error: " + err.message;
   }
+};
+
+// 🧾 TICKET DOWNLOAD
+document.getElementById("ticketBtn").onclick = () => {
+  const show = document.getElementById("show").value;
+  const time = document.getElementById("time").value;
+  const type = document.getElementById("type").value;
+
+  const text = `
+🎭 THEATRE TICKET
+
+Show: ${show}
+Time: ${time}
+Type: ${type}
+Seats: ${selected.join(", ")}
+Total: $${selected.length * (type === "adult" ? 15 : 8)}
+`;
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ticket.txt";
+  a.click();
 };
 
 // 🔄 reload
