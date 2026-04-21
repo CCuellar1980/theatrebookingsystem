@@ -13,11 +13,11 @@
 
   <h1 class="text-3xl font-extrabold text-center mb-2">🎭 Theatre Booking</h1>
   <p class="text-center text-gray-500 mb-6">
-    Select your show, time, and seats
+    Select your show, time, seats, and ticket type
   </p>
 
   <!-- FORM -->
-  <div class="grid md:grid-cols-2 gap-4 mb-6">
+  <div class="grid md:grid-cols-3 gap-4 mb-6">
 
     <div>
       <label class="text-sm font-semibold text-gray-600">Show</label>
@@ -39,17 +39,34 @@
       </select>
     </div>
 
+    <div>
+      <label class="text-sm font-semibold text-gray-600">Ticket Type</label>
+      <select id="ticketType" class="w-full p-3 border rounded-xl">
+        <option value="">Choose type</option>
+        <option value="adult">Adult ($15)</option>
+        <option value="kid">Kid ($8)</option>
+      </select>
+    </div>
+
   </div>
 
   <!-- SEATS -->
   <h2 class="font-bold mb-2">Choose Seats</h2>
-  <div id="seats" class="grid grid-cols-5 gap-3 mb-4"></div>
-  <p class="text-sm text-gray-500 mb-4">You can select multiple seats</p>
+  <div id="seats" class="grid grid-cols-5 gap-3 mb-2"></div>
 
-  <!-- BUTTON -->
+  <div id="totalPrice" class="text-center font-bold text-lg mb-2"></div>
+
+  <p class="text-sm text-gray-500 mb-4">Green = selected | Red = unavailable</p>
+
+  <!-- BUTTONS -->
   <button id="bookBtn"
     class="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700">
     🎟️ Book Now
+  </button>
+
+  <button id="clearBtn"
+    class="w-full mt-2 bg-gray-300 text-black py-2 rounded-xl font-semibold hover:bg-gray-400">
+    Clear Selection
   </button>
 
   <!-- MESSAGE -->
@@ -76,14 +93,13 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR REAL CONFIG (keep this)
 const firebaseConfig = {
-  apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
-  authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
-  projectId: "theatre-booking-system-d45a7",
-  storageBucket: "theatre-booking-system-d45a7.appspot.com",
-  messagingSenderId: "66972534681",
-  appId: "1:66972534681:web:1995cb45236fc107ee3508"
+  apiKey: "YOUR_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_MSG_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -104,6 +120,8 @@ for (let i = 1; i <= 15; i++) {
     "p-3 text-center rounded-xl cursor-pointer bg-gray-200 hover:bg-gray-300 font-bold";
 
   seat.onclick = () => {
+    if (seat.classList.contains("cursor-not-allowed")) return;
+
     if (selectedSeats.includes(i)) {
       selectedSeats = selectedSeats.filter(s => s !== i);
       seat.classList.remove("bg-green-500", "text-white");
@@ -111,10 +129,24 @@ for (let i = 1; i <= 15; i++) {
       selectedSeats.push(i);
       seat.classList.add("bg-green-500", "text-white");
     }
+
+    updateTotal();
   };
 
   seatsContainer.appendChild(seat);
 }
+
+// 💰 TOTAL PRICE
+function updateTotal() {
+  const type = document.getElementById("ticketType").value;
+  const price = type === "adult" ? 15 : type === "kid" ? 8 : 0;
+  const total = price * selectedSeats.length;
+
+  document.getElementById("totalPrice").textContent =
+    total > 0 ? `Total: $${total}` : "";
+}
+
+document.getElementById("ticketType").onchange = updateTotal;
 
 // 📢 MESSAGE
 function showMessage(text, color) {
@@ -138,43 +170,82 @@ async function isAnySeatBooked(show, time, seats) {
   return false;
 }
 
-// 📥 LOAD BOOKINGS
+// 📥 LOAD BOOKINGS + LOCK SEATS
 async function loadBookings() {
   bookingList.innerHTML = "";
 
   const snapshot = await getDocs(collection(db, "bookings"));
 
+  const bookedSeatsMap = {};
+  const groupedBookings = {};
+
   snapshot.forEach((docSnap) => {
     const b = docSnap.data();
+    const key = `${b.show}-${b.time}`;
 
-    const li = document.createElement("li");
-    li.className =
-      "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
+    if (!bookedSeatsMap[key]) bookedSeatsMap[key] = [];
+    bookedSeatsMap[key].push(b.seat);
 
-    li.innerHTML = `
-      <span>${b.show} | ${b.time} | Seat ${b.seat}</span>
-      <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
-    `;
-
-    li.querySelector("button").onclick = async () => {
-      await deleteDoc(doc(db, "bookings", docSnap.id));
-      showMessage("Booking deleted", "red");
-      loadBookings();
-    };
-
-    bookingList.appendChild(li);
+    if (!groupedBookings[key]) groupedBookings[key] = [];
+    groupedBookings[key].push({ ...b, id: docSnap.id });
   });
+
+  const show = document.getElementById("show").value;
+  const time = document.getElementById("time").value;
+  const currentKey = `${show}-${time}`;
+
+  document.querySelectorAll("#seats div").forEach((seatDiv, index) => {
+    const seatNum = index + 1;
+
+    seatDiv.classList.remove("bg-red-400", "cursor-not-allowed");
+
+    if (bookedSeatsMap[currentKey]?.includes(seatNum)) {
+      seatDiv.classList.add("bg-red-400", "cursor-not-allowed");
+    }
+  });
+
+  for (let key in groupedBookings) {
+    const header = document.createElement("li");
+    header.className = "font-bold mt-4";
+    header.textContent = key.replace("-", " | ");
+    bookingList.appendChild(header);
+
+    groupedBookings[key].forEach((b) => {
+      const li = document.createElement("li");
+      li.className =
+        "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
+
+      const icon = b.ticketType === "adult" ? "👨" : "👧";
+
+      li.innerHTML = `
+        <span>${icon} Seat ${b.seat} | $${b.price}</span>
+        <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
+      `;
+
+      li.querySelector("button").onclick = async () => {
+        await deleteDoc(doc(db, "bookings", b.id));
+        showMessage("Booking deleted", "red");
+        loadBookings();
+      };
+
+      bookingList.appendChild(li);
+    });
+  }
 }
 
 // 🎯 BOOK
 document.getElementById("bookBtn").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
+  const ticketType = document.getElementById("ticketType").value;
 
-  if (!show || !time || selectedSeats.length === 0) {
+  if (!show || !time || !ticketType || selectedSeats.length === 0) {
     showMessage("⚠️ Complete all fields", "red");
     return;
   }
+
+  const pricePerTicket = ticketType === "adult" ? 15 : 8;
+  const totalPrice = pricePerTicket * selectedSeats.length;
 
   const taken = await isAnySeatBooked(show, time, selectedSeats);
 
@@ -187,20 +258,37 @@ document.getElementById("bookBtn").onclick = async () => {
     await addDoc(collection(db, "bookings"), {
       show,
       time,
-      seat
+      seat,
+      ticketType,
+      price: pricePerTicket
     });
   }
 
-  showMessage("✅ Booking successful!", "green");
+  showMessage(`✅ Booking successful! Total: $${totalPrice}`, "green");
 
   selectedSeats = [];
   document.querySelectorAll("#seats div").forEach(s =>
     s.classList.remove("bg-green-500", "text-white")
   );
 
+  updateTotal();
   loadBookings();
 };
 
+// 🧹 CLEAR
+document.getElementById("clearBtn").onclick = () => {
+  selectedSeats = [];
+  document.querySelectorAll("#seats div").forEach(seat =>
+    seat.classList.remove("bg-green-500", "text-white")
+  );
+  updateTotal();
+};
+
+// 🔄 REFRESH
+document.getElementById("show").onchange = loadBookings;
+document.getElementById("time").onchange = loadBookings;
+
+// INIT
 loadBookings();
 </script>
 
