@@ -56,7 +56,9 @@
 
   <div id="totalPrice" class="text-center font-bold text-lg mb-2"></div>
 
-  <p class="text-sm text-gray-500 mb-4">Green = selected | Red = unavailable</p>
+  <p class="text-sm text-gray-500 mb-4">
+    Green = selected | Red = unavailable
+  </p>
 
   <!-- BUTTONS -->
   <button id="bookBtn"
@@ -93,13 +95,14 @@ import {
   where
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+// 🔥 YOUR REAL FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "YOUR_KEY",
-  authDomain: "YOUR_DOMAIN",
-  projectId: "YOUR_ID",
-  storageBucket: "YOUR_BUCKET",
-  messagingSenderId: "YOUR_MSG_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
+  authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
+  projectId: "theatre-booking-system-d45a7",
+  storageBucket: "theatre-booking-system-d45a7.appspot.com",
+  messagingSenderId: "66972534681",
+  appId: "1:66972534681:web:1995cb45236fc107ee3508"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -111,16 +114,17 @@ const messageBox = document.getElementById("message");
 
 let selectedSeats = [];
 
-// 🎟️ CREATE SEATS
+// 🎟 CREATE SEATS
 for (let i = 1; i <= 15; i++) {
   const seat = document.createElement("div");
   seat.textContent = i;
+  seat.dataset.num = i;
 
   seat.className =
     "p-3 text-center rounded-xl cursor-pointer bg-gray-200 hover:bg-gray-300 font-bold";
 
   seat.onclick = () => {
-    if (seat.classList.contains("cursor-not-allowed")) return;
+    if (seat.classList.contains("locked")) return;
 
     if (selectedSeats.includes(i)) {
       selectedSeats = selectedSeats.filter(s => s !== i);
@@ -143,7 +147,7 @@ function updateTotal() {
   const total = price * selectedSeats.length;
 
   document.getElementById("totalPrice").textContent =
-    total > 0 ? `Total: $${total}` : "";
+    total ? `Total: $${total}` : "";
 }
 
 document.getElementById("ticketType").onchange = updateTotal;
@@ -151,23 +155,7 @@ document.getElementById("ticketType").onchange = updateTotal;
 // 📢 MESSAGE
 function showMessage(text, color) {
   messageBox.textContent = text;
-  messageBox.className = `text-${color}-600 text-center mt-4 font-bold`;
-}
-
-// 🚫 CHECK DUPLICATE
-async function isAnySeatBooked(show, time, seats) {
-  for (let seat of seats) {
-    const q = query(
-      collection(db, "bookings"),
-      where("show", "==", show),
-      where("time", "==", time),
-      where("seat", "==", seat)
-    );
-
-    const snapshot = await getDocs(q);
-    if (!snapshot.empty) return true;
-  }
-  return false;
+  messageBox.className = `text-${color}-600 mt-4 font-bold text-center`;
 }
 
 // 📥 LOAD BOOKINGS + LOCK SEATS
@@ -176,95 +164,93 @@ async function loadBookings() {
 
   const snapshot = await getDocs(collection(db, "bookings"));
 
-  const bookedSeatsMap = {};
-  const groupedBookings = {};
+  let booked = [];
 
   snapshot.forEach((docSnap) => {
     const b = docSnap.data();
-    const key = `${b.show}-${b.time}`;
 
-    if (!bookedSeatsMap[key]) bookedSeatsMap[key] = [];
-    bookedSeatsMap[key].push(b.seat);
+    // show bookings list
+    const li = document.createElement("li");
+    li.className =
+      "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
 
-    if (!groupedBookings[key]) groupedBookings[key] = [];
-    groupedBookings[key].push({ ...b, id: docSnap.id });
-  });
+    const icon = b.ticketType === "adult" ? "👨" : "👧";
 
-  const show = document.getElementById("show").value;
-  const time = document.getElementById("time").value;
-  const currentKey = `${show}-${time}`;
+    li.innerHTML = `
+      <span>${b.show} | ${b.time} | ${icon} Seat ${b.seat} | $${b.price}</span>
+      <button class="text-red-500 font-bold">Delete</button>
+    `;
 
-  document.querySelectorAll("#seats div").forEach((seatDiv, index) => {
-    const seatNum = index + 1;
+    li.querySelector("button").onclick = async () => {
+      await deleteDoc(doc(db, "bookings", docSnap.id));
+      loadBookings();
+    };
 
-    seatDiv.classList.remove("bg-red-400", "cursor-not-allowed");
+    bookingList.appendChild(li);
 
-    if (bookedSeatsMap[currentKey]?.includes(seatNum)) {
-      seatDiv.classList.add("bg-red-400", "cursor-not-allowed");
+    // collect booked seats for current selection
+    const show = document.getElementById("show").value;
+    const time = document.getElementById("time").value;
+
+    if (b.show === show && b.time === time) {
+      booked.push(b.seat);
     }
   });
 
-  for (let key in groupedBookings) {
-    const header = document.createElement("li");
-    header.className = "font-bold mt-4";
-    header.textContent = key.replace("-", " | ");
-    bookingList.appendChild(header);
+  // apply locked seats
+  document.querySelectorAll("#seats div").forEach(seat => {
+    const num = Number(seat.dataset.num);
 
-    groupedBookings[key].forEach((b) => {
-      const li = document.createElement("li");
-      li.className =
-        "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
+    seat.classList.remove("bg-red-400", "locked");
 
-      const icon = b.ticketType === "adult" ? "👨" : "👧";
-
-      li.innerHTML = `
-        <span>${icon} Seat ${b.seat} | $${b.price}</span>
-        <button class="text-red-500 font-bold hover:text-red-700">Delete</button>
-      `;
-
-      li.querySelector("button").onclick = async () => {
-        await deleteDoc(doc(db, "bookings", b.id));
-        showMessage("Booking deleted", "red");
-        loadBookings();
-      };
-
-      bookingList.appendChild(li);
-    });
-  }
+    if (booked.includes(num)) {
+      seat.classList.add("bg-red-400", "locked");
+      seat.classList.remove("bg-green-500", "text-white");
+    }
+  });
 }
 
 // 🎯 BOOK
 document.getElementById("bookBtn").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
-  const ticketType = document.getElementById("ticketType").value;
+  const type = document.getElementById("ticketType").value;
 
-  if (!show || !time || !ticketType || selectedSeats.length === 0) {
+  if (!show || !time || !type || selectedSeats.length === 0) {
     showMessage("⚠️ Complete all fields", "red");
     return;
   }
 
-  const pricePerTicket = ticketType === "adult" ? 15 : 8;
-  const totalPrice = pricePerTicket * selectedSeats.length;
+  const price = type === "adult" ? 15 : 8;
 
-  const taken = await isAnySeatBooked(show, time, selectedSeats);
+  // check duplicates
+  for (let seat of selectedSeats) {
+    const q = query(
+      collection(db, "bookings"),
+      where("show", "==", show),
+      where("time", "==", time),
+      where("seat", "==", seat)
+    );
 
-  if (taken) {
-    showMessage("❌ One or more seats already booked", "red");
-    return;
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      showMessage("❌ Seat already booked", "red");
+      return;
+    }
   }
 
+  // save bookings
   for (let seat of selectedSeats) {
     await addDoc(collection(db, "bookings"), {
       show,
       time,
       seat,
-      ticketType,
-      price: pricePerTicket
+      ticketType: type,
+      price
     });
   }
 
-  showMessage(`✅ Booking successful! Total: $${totalPrice}`, "green");
+  showMessage("✅ Booking successful!", "green");
 
   selectedSeats = [];
   document.querySelectorAll("#seats div").forEach(s =>
@@ -278,8 +264,8 @@ document.getElementById("bookBtn").onclick = async () => {
 // 🧹 CLEAR
 document.getElementById("clearBtn").onclick = () => {
   selectedSeats = [];
-  document.querySelectorAll("#seats div").forEach(seat =>
-    seat.classList.remove("bg-green-500", "text-white")
+  document.querySelectorAll("#seats div").forEach(s =>
+    s.classList.remove("bg-green-500", "text-white")
   );
   updateTotal();
 };
