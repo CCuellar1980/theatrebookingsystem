@@ -1,50 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Theatre Booking</title>
 <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center p-4">
 
-<div class="bg-white p-6 rounded-xl w-full max-w-md shadow-xl">
+<div class="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
 
-<h1 class="text-xl font-bold mb-4 text-center">🎭 Booking</h1>
+  <h1 class="text-3xl font-extrabold text-center mb-4">🎭 Theatre Booking</h1>
 
-<select id="show" class="w-full p-2 border mb-2">
-  <option value="">Show</option>
-  <option>Hamlet</option>
-</select>
+  <!-- FORM -->
+  <div class="grid md:grid-cols-3 gap-4 mb-6">
 
-<select id="time" class="w-full p-2 border mb-2">
-  <option value="">Time</option>
-  <option>18:00</option>
-</select>
+    <select id="show" class="p-3 border rounded-xl">
+      <option value="">Show</option>
+      <option>Hamlet</option>
+      <option>The Lion King</option>
+      <option>Phantom</option>
+    </select>
 
-<select id="type" class="w-full p-2 border mb-2">
-  <option value="">Type</option>
-  <option value="adult">Adult $15</option>
-  <option value="kid">Kid $8</option>
-</select>
+    <select id="time" class="p-3 border rounded-xl">
+      <option value="">Time</option>
+      <option>18:00</option>
+      <option>20:00</option>
+    </select>
 
-<div id="seats" class="grid grid-cols-5 gap-2 mb-3"></div>
+    <select id="type" class="p-3 border rounded-xl">
+      <option value="">Type</option>
+      <option value="adult">Adult $15</option>
+      <option value="kid">Kid $8</option>
+    </select>
 
-<div id="total" class="font-bold text-center mb-2"></div>
+  </div>
 
-<button id="book" class="w-full bg-purple-600 text-white p-2 rounded">
-  Book Now
-</button>
+  <!-- SEATS -->
+  <div id="seats" class="grid grid-cols-5 gap-2 mb-4"></div>
 
-<div id="msg" class="text-center mt-3 font-bold"></div>
+  <!-- TOTAL -->
+  <div id="total" class="text-center font-bold mb-2"></div>
+
+  <!-- BUTTON -->
+  <button id="book" class="w-full bg-purple-600 text-white p-3 rounded-xl">
+    Book Now
+  </button>
+
+  <!-- MESSAGE -->
+  <div id="msg" class="text-center mt-3 font-bold"></div>
+
+  <!-- BOOKINGS -->
+  <ul id="list" class="mt-6 space-y-2"></ul>
 
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR CONFIG
+// 🔥 YOUR FIREBASE CONFIG (UNCHANGED)
 const firebaseConfig = {
   apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
   authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
@@ -56,15 +72,17 @@ const db = getFirestore(app);
 
 let selected = [];
 
-// seats
+// 🎟 SEATS
 const seatsDiv = document.getElementById("seats");
 
-for (let i = 1; i <= 10; i++) {
+for (let i = 1; i <= 15; i++) {
   const s = document.createElement("div");
   s.textContent = i;
-  s.className = "p-2 bg-gray-300 text-center rounded cursor-pointer";
+  s.className = "p-3 bg-gray-200 text-center rounded cursor-pointer font-bold";
 
   s.onclick = () => {
+    if (s.classList.contains("bg-red-400")) return;
+
     if (selected.includes(i)) {
       selected = selected.filter(x => x !== i);
       s.classList.remove("bg-green-500","text-white");
@@ -72,32 +90,70 @@ for (let i = 1; i <= 10; i++) {
       selected.push(i);
       s.classList.add("bg-green-500","text-white");
     }
+
     updateTotal();
   };
 
   seatsDiv.appendChild(s);
 }
 
-// total
+// 💰 TOTAL PRICE
 function updateTotal() {
   const type = document.getElementById("type").value;
   const price = type === "adult" ? 15 : type === "kid" ? 8 : 0;
+
   document.getElementById("total").textContent =
-    selected.length ? "Total: $" + (price * selected.length) : "";
+    selected.length ? "Total: $" + (selected.length * price) : "";
 }
 
 document.getElementById("type").onchange = updateTotal;
 
-// BOOK (DEBUG VERSION)
+// 📥 LOAD BOOKINGS + LOCK SEATS
+async function load() {
+  const snap = await getDocs(collection(db, "bookings"));
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  let booked = [];
+
+  snap.forEach(d => {
+    const b = d.data();
+
+    list.innerHTML += `
+      <li>${b.show} | ${b.time} | ${b.type} | Seat ${b.seat} | $${b.price}</li>
+    `;
+
+    if (
+      b.show === document.getElementById("show").value &&
+      b.time === document.getElementById("time").value
+    ) {
+      booked.push(b.seat);
+    }
+  });
+
+  // 🔴 lock seats
+  document.querySelectorAll("#seats div").forEach((s, i) => {
+    const num = i + 1;
+    s.classList.remove("bg-red-400");
+
+    if (booked.includes(num)) {
+      s.classList.add("bg-red-400");
+    }
+  });
+}
+
+// 🎯 BOOK (FINAL FIX)
 document.getElementById("book").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
   const type = document.getElementById("type").value;
 
   if (!show || !time || !type || selected.length === 0) {
-    document.getElementById("msg").textContent = "❌ Fill everything";
+    document.getElementById("msg").textContent = "⚠️ Fill everything";
     return;
   }
+
+  const price = type === "adult" ? 15 : 8;
 
   try {
     for (let seat of selected) {
@@ -105,17 +161,33 @@ document.getElementById("book").onclick = async () => {
         show,
         time,
         type,
-        seat
+        seat,
+        price
       });
     }
 
-    document.getElementById("msg").textContent = "✅ BOOKED SUCCESSFULLY";
+    document.getElementById("msg").textContent = "✅ Booked successfully!";
+
+    selected = [];
+    document.querySelectorAll("#seats div").forEach(s =>
+      s.classList.remove("bg-green-500","text-white")
+    );
+
+    updateTotal();
+    load();
 
   } catch (error) {
-    console.error("FIREBASE ERROR:", error);
-    document.getElementById("msg").textContent = "❌ ERROR: " + error.message;
+    console.error(error);
+    document.getElementById("msg").textContent =
+      "❌ Firebase Error: " + error.message;
   }
 };
+
+// 🔄 reload
+document.getElementById("show").onchange = load;
+document.getElementById("time").onchange = load;
+
+load();
 </script>
 
 </body>
