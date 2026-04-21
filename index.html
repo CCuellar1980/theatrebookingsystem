@@ -57,7 +57,7 @@
   <div id="totalPrice" class="text-center font-bold text-lg mb-2"></div>
 
   <p class="text-sm text-gray-500 mb-4">
-    Green = selected | Red = unavailable
+    🟩 Selected | 🟥 Unavailable
   </p>
 
   <!-- BUTTONS -->
@@ -90,12 +90,10 @@ import {
   addDoc,
   getDocs,
   deleteDoc,
-  doc,
-  query,
-  where
+  doc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// 🔥 YOUR REAL FIREBASE CONFIG
+// 🔥 YOUR FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDeanKcppyEQVFiYEPLe68FvN4ozn38-A0",
   authDomain: "theatre-booking-system-d45a7.firebaseapp.com",
@@ -140,7 +138,7 @@ for (let i = 1; i <= 15; i++) {
   seatsContainer.appendChild(seat);
 }
 
-// 💰 TOTAL PRICE
+// 💰 TOTAL
 function updateTotal() {
   const type = document.getElementById("ticketType").value;
   const price = type === "adult" ? 15 : type === "kid" ? 8 : 0;
@@ -163,13 +161,14 @@ async function loadBookings() {
   bookingList.innerHTML = "";
 
   const snapshot = await getDocs(collection(db, "bookings"));
-
   let booked = [];
+
+  const show = document.getElementById("show").value;
+  const time = document.getElementById("time").value;
 
   snapshot.forEach((docSnap) => {
     const b = docSnap.data();
 
-    // show bookings list
     const li = document.createElement("li");
     li.className =
       "flex justify-between items-center bg-gray-100 p-3 rounded-xl";
@@ -188,16 +187,12 @@ async function loadBookings() {
 
     bookingList.appendChild(li);
 
-    // collect booked seats for current selection
-    const show = document.getElementById("show").value;
-    const time = document.getElementById("time").value;
-
     if (b.show === show && b.time === time) {
       booked.push(b.seat);
     }
   });
 
-  // apply locked seats
+  // 🔒 LOCK SEATS
   document.querySelectorAll("#seats div").forEach(seat => {
     const num = Number(seat.dataset.num);
 
@@ -210,7 +205,7 @@ async function loadBookings() {
   });
 }
 
-// 🎯 BOOK
+// 🎯 BOOK (FIXED)
 document.getElementById("bookBtn").onclick = async () => {
   const show = document.getElementById("show").value;
   const time = document.getElementById("time").value;
@@ -223,23 +218,23 @@ document.getElementById("bookBtn").onclick = async () => {
 
   const price = type === "adult" ? 15 : 8;
 
-  // check duplicates
-  for (let seat of selectedSeats) {
-    const q = query(
-      collection(db, "bookings"),
-      where("show", "==", show),
-      where("time", "==", time),
-      where("seat", "==", seat)
-    );
+  const snapshot = await getDocs(collection(db, "bookings"));
+  let takenSeats = [];
 
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      showMessage("❌ Seat already booked", "red");
-      return;
+  snapshot.forEach(docSnap => {
+    const b = docSnap.data();
+    if (b.show === show && b.time === time) {
+      takenSeats.push(b.seat);
     }
+  });
+
+  const conflict = selectedSeats.some(seat => takenSeats.includes(seat));
+
+  if (conflict) {
+    showMessage("❌ One or more seats already booked", "red");
+    return;
   }
 
-  // save bookings
   for (let seat of selectedSeats) {
     await addDoc(collection(db, "bookings"), {
       show,
